@@ -1,0 +1,36 @@
+# docker-compose para levantar el ETL en la VM 10.43.101.13 (misma que las BDs).
+#
+# El ETL convive con PostgreSQL y CouchDB en la misma máquina para minimizar
+# latencia en las operaciones de lectura/escritura masiva.
+#
+# Uso:
+#   docker compose -f docker/docker-compose.prod.yml up -d --build
+#
+# Para disparar el ETL:
+#   curl -X POST http://localhost:8083/etl/ejecutar
+#
+# Para ver logs:
+#   docker logs vote4tech-etl --follow
+
+services:
+  etl-votacion:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: vote4tech-etl:latest
+    container_name: vote4tech-etl
+    ports:
+      - "8083:8083"
+    environment:
+      # PostgreSQL (localhost porque corre en la misma VM)
+      DB_URL: jdbc:postgresql://localhost:5432/bd_nacional_vote4tech
+      DB_USER: admin_db_nacional
+      DB_PASSWORD: "12345"
+      # CouchDB (localhost porque corre en la misma VM)
+      COUCHDB_URL: http://localhost:5984
+      COUCHDB_USER: admin
+      COUCHDB_PASSWORD: admin123
+      COUCHDB_DB_URNA: votos_urna
+      COUCHDB_DB_DOMICILIO: votos_domicilio
+    network_mode: host
+    restart: unless-stopped

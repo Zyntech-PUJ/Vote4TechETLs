@@ -129,18 +129,20 @@ public class SincronizacionJobConfig {
                         """,
                         jobRepository, publicaTm))
 
-                // 3. ELECCION — listada en el portal (FK → REGISTRADOR).
+                // 3. ELECCION — listada en el portal.
+                //    La tabla ELECCION en bd_nacional usa id_administrador_electoral (no id_registrador),
+                //    por lo que sincronizamos solo los metadatos de la elección sin FK de administrador.
                 .next(buildStep("syncEleccion",
                         """
                         SELECT id_eleccion, nombre, fecha_inicio, fecha_finalizacion,
-                               fecha_creacion, tipo, lista_abierta, estado, id_registrador
+                               fecha_creacion, tipo, lista_abierta, estado
                         FROM eleccion
                         """,
                         """
                         INSERT INTO eleccion (id_eleccion, nombre, fecha_inicio, fecha_finalizacion,
-                                             fecha_creacion, tipo, lista_abierta, estado, id_registrador)
+                                             fecha_creacion, tipo, lista_abierta, estado)
                         VALUES (:id_eleccion, :nombre, :fecha_inicio, :fecha_finalizacion,
-                                :fecha_creacion, :tipo, :lista_abierta, :estado, :id_registrador)
+                                :fecha_creacion, :tipo, :lista_abierta, :estado)
                         ON CONFLICT (id_eleccion) DO UPDATE SET
                           nombre              = EXCLUDED.nombre,
                           fecha_inicio        = EXCLUDED.fecha_inicio,
@@ -148,26 +150,39 @@ public class SincronizacionJobConfig {
                           fecha_creacion      = EXCLUDED.fecha_creacion,
                           tipo                = EXCLUDED.tipo,
                           lista_abierta       = EXCLUDED.lista_abierta,
-                          estado              = EXCLUDED.estado,
-                          id_registrador      = EXCLUDED.id_registrador
+                          estado              = EXCLUDED.estado
                         """,
                         jobRepository, publicaTm))
 
-                // 4. CANDIDATO — listado en el portal (FK → REGISTRADOR).
+                // 4. CANDIDATO — listado en el portal (FK → REGISTRADOR + ELECCION).
+                //    JOIN con LISTA para obtener id_eleccion (la entidad bd_nacional no lo tiene directamente).
+                //    JOIN con PARTIDO para obtener logo_url como partido_logo_url.
+                //    foto_url no existe como columna VARCHAR en bd_nacional (solo hay BLOB 'foto'),
+                //    por lo que se sincroniza como NULL.
                 .next(buildStep("syncCandidato",
                         """
-                        SELECT id_candidato, nombre, numero, foto_url, partido_logo_url, id_registrador
-                        FROM candidato
+                        SELECT c.id_candidato, c.nombre, c.numero,
+                               NULL::varchar                AS foto_url,
+                               p.logo_url                  AS partido_logo_url,
+                               c.id_registrador,
+                               l.id_eleccion
+                        FROM candidato c
+                        JOIN lista l    ON c.id_lista    = l.id_lista
+                        LEFT JOIN partido p ON c.id_partido = p.id_partido
+                        WHERE c.activo = true
                         """,
                         """
-                        INSERT INTO candidato (id_candidato, nombre, numero, foto_url, partido_logo_url, id_registrador)
-                        VALUES (:id_candidato, :nombre, :numero, :foto_url, :partido_logo_url, :id_registrador)
+                        INSERT INTO candidato (id_candidato, nombre, numero, foto_url, partido_logo_url,
+                                              id_registrador, id_eleccion)
+                        VALUES (:id_candidato, :nombre, :numero, :foto_url, :partido_logo_url,
+                                :id_registrador, :id_eleccion)
                         ON CONFLICT (id_candidato) DO UPDATE SET
                           nombre           = EXCLUDED.nombre,
                           numero           = EXCLUDED.numero,
                           foto_url         = EXCLUDED.foto_url,
                           partido_logo_url = EXCLUDED.partido_logo_url,
-                          id_registrador   = EXCLUDED.id_registrador
+                          id_registrador   = EXCLUDED.id_registrador,
+                          id_eleccion      = EXCLUDED.id_eleccion
                         """,
                         jobRepository, publicaTm))
 

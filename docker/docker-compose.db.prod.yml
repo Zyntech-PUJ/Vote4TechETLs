@@ -1,0 +1,90 @@
+# docker-compose para levantar TODA la infraestructura del VM de bases de datos (10.43.101.13):
+#   - PostgreSQL 16      → puerto 5432
+#   - CouchDB 3          → puerto 5984
+#   - ETL (Spring Batch) → puerto 8083
+#
+# Uso (en el VM de BDs):
+#   docker compose -f docker/docker-compose.db.prod.yml up -d --build
+#
+# Verificar que todo arrancó:
+#   docker exec -it vote4tech-postgres psql -U admin_db_nacional -c "\l"
+#   curl http://localhost:5984/
+#   curl http://localhost:8083/actuator/health
+#
+# Disparar el ETL de votos (CouchDB → PostgreSQL):
+#   curl -X POST http://localhost:8083/etl/ejecutar
+#
+# Disparar el ETL de sincronización (nacional → publica):
+#   curl -X POST http://localhost:8083/sincronizacion/ejecutar
+#
+# NOTA: bd_publica se crea automáticamente la PRIMERA VEZ que arranca PostgreSQL
+#       gracias al script docker/init/01-create-databases.sh.
+#       Si el volumen ya existe, crearla manualmente:
+#         docker exec -it vote4tech-postgres psql -U admin_db_nacional \
+#           -c "CREATE DATABASE bd_publica OWNER admin_db_nacional;"
+
+name: vote4tech-db
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: vote4tech-postgres
+    environment:
+      POSTGRES_DB: bd_nacional_vote4tech
+      POSTGRES_USER: admin_db_nacional
+      POSTGRES_PASSWORD: "12345"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Script de inicialización: crea bd_publica si no existe
+      - ./init:/docker-entrypoint-initdb.d:ro
+    restart: unless-stopped
+
+  couchdb:
+    image: couchdb:3
+    container_name: vote4tech-couchdb
+    environment:
+      COUCHDB_USER: admin
+      COUCHDB_PASSWORD: admin123
+    ports:
+      - "5984:5984"
+    volumes:
+      - couchdb_data:/opt/couchdb/data
+    restart: unless-stopped
+
+  etl-votacion:
+    build:
+      context: ..            # raíz del repo Vote4TechETLs
+      dockerfile: Dockerfile
+    image: vote4tech-etl:latest
+    container_name: vote4tech-etl
+    ports:
+      - "8083:8083"
+    environment:
+      # Datasource principal (Spring Batch metadata + lectura de votos SQL)
+      DB_URL: jdbc:postgresql://postgres:5432/bd_nacional_vote4tech
+      DB_USER: admin_db_nacional
+      DB_PASSWORD: "12345"
+      # CouchDB
+      COUCHDB_URL: http://couchdb:5984
+      COUCHDB_USER: admin
+      COUCHDB_PASSWORD: admin123
+      COUCHDB_DB_URNA: votos_urna
+      COUCHDB_DB_DOMICILIO: votos_domicilio
+      # Datasources para el job de sincronización nacional → pública
+      BD_NACIONAL_URL: jdbc:postgresql://postgres:5432/bd_nacional_vote4tech
+      BD_NACIONAL_USER: admin_db_nacional
+      BD_NACIONAL_PASSWORD: "12345"
+      BD_PUBLICA_URL: jdbc:postgresql://postgres:5432/bd_publica
+      BD_PUBLICA_USER: admin_db_nacional
+      BD_PUBLICA_PASSWORD: "12345"
+    depends_on:
+      - postgres
+      - couchdb
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  couchdb_data:

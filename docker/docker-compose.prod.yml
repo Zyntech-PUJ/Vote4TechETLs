@@ -32,5 +32,12 @@ services:
       COUCHDB_PASSWORD: admin123
       COUCHDB_DB_URNA: votos_urna
       COUCHDB_DB_DOMICILIO: votos_domicilio
+      # Datasources para el job de sincronización nacional → pública
+      BD_NACIONAL_URL: jdbc:postgresql://localhost:5432/bd_nacional_vote4tech
+      BD_NACIONAL_USER: admin_db_nacional
+      BD_NACIONAL_PASSWORD: "12345"
+      BD_PUBLICA_URL: jdbc:postgresql://localhost:5432/bd_publica
+      BD_PUBLICA_USER: admin_db_nacional
+      BD_PUBLICA_PASSWORD: "12345"
     network_mode: host
     restart: unless-stopped

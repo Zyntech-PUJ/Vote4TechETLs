@@ -42,9 +42,16 @@ public class VotoSql {
     @Column(name = "tipo_seleccion", length = 16)
     private String tipoSeleccion;
 
+    @Column(name = "id_candidato")
+    private Long idCandidato;
+
     @Column(name = "id_seleccion")
     private Long idSeleccion;
 
     @Column(name = "timestamp_voto", length = 32)
     private String timestamp;
+
+    /** Base de origen: URNA (votos_urna) o DOMICILIO (votos_domicilio) */
+    @Column(name = "fuente", length = 16)
+    private String fuente;
 }

@@ -2,6 +2,7 @@ package co.gov.etlvotacion.couchdb;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -59,12 +60,12 @@ public class CouchDbClient {
      */
     public List<JsonNode> getAllVotos() {
         List<JsonNode> todos = new ArrayList<>();
-        todos.addAll(fetchFromDb(dbUrna));
-        todos.addAll(fetchFromDb(dbDomicilio));
+        todos.addAll(fetchFromDb(dbUrna, "URNA"));
+        todos.addAll(fetchFromDb(dbDomicilio, "DOMICILIO"));
         return todos;
     }
 
-    private List<JsonNode> fetchFromDb(String db) {
+    private List<JsonNode> fetchFromDb(String db, String fuente) {
         try {
             String response = restClient.get()
                     .uri("/" + db + "/_all_docs?include_docs=true")
@@ -76,6 +77,7 @@ public class CouchDbClient {
             for (JsonNode row : root.path("rows")) {
                 JsonNode doc = row.path("doc");
                 if (!doc.path("_id").asText().startsWith("_design/")) {
+                    ((ObjectNode) doc).put("_fuente", fuente);
                     docs.add(doc);
                 }
             }

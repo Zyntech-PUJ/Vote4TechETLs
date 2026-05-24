@@ -24,15 +24,22 @@ public class VotoItemProcessor implements ItemProcessor<JsonNode, VotoSql> {
         if (repositoryVotoSql.existsById(id)) {
             return null; // Spring Batch omite el item — idempotente
         }
+        Long idSeleccion = nullableLong(doc, "idSeleccion");
+        String tipoSel = doc.path("tipoSeleccion").asText(null);
+        // idSeleccion es el candidato cuando tipoSeleccion=CANDIDATO o cuando no hay tipoSeleccion (domicilio)
+        Long idCandidato = (tipoSel == null || "CANDIDATO".equals(tipoSel)) ? idSeleccion : null;
+
         return VotoSql.builder()
                 .idVoto(id)
                 .idEleccion(nullableLong(doc, "idEleccion"))
                 .idMesa(nullableLong(doc, "idMesa"))
                 .tipoMesa(doc.path("tipoMesa").asText(null))
                 .idCentroVotacion(nullableLong(doc, "idCentroVotacion"))
-                .tipoSeleccion(doc.path("tipoSeleccion").asText(null))
-                .idSeleccion(nullableLong(doc, "idSeleccion"))
+                .tipoSeleccion(tipoSel)
+                .idSeleccion(idSeleccion)
+                .idCandidato(idCandidato)
                 .timestamp(doc.path("timestamp").asText(null))
+                .fuente(doc.path("_fuente").asText(null))
                 .build();
     }
 
